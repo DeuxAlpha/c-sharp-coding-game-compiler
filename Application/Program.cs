@@ -27,6 +27,8 @@ namespace Application
                 watcher.EnableRaisingEvents = true;
             });
 
+            Compile();
+
             Console.WriteLine("Press ESC to stop.");
 
             while (Console.ReadKey(true).Key != ConsoleKey.Escape)
@@ -40,6 +42,11 @@ namespace Application
         private static void OnWatcherTriggered(object sender, FileSystemEventArgs e)
         {
             Console.WriteLine("Change triggered.");
+            Compile();
+        }
+
+        private static void Compile()
+        {
             var directoryInfo = new DirectoryInfo(_options.WorkingDirectory);
             var programFiles = Directory.GetFiles(directoryInfo.FullName, "*.cs", SearchOption.AllDirectories)
                 .Where(file => !file.Contains(@"\obj\") && !file.Contains(@"\bin\"))
@@ -52,6 +59,7 @@ namespace Application
                     {
                         fileContent += $"{streamReader.ReadLine()}{Environment.NewLine}";
                     }
+
                     var namespaceMatch = Regex.Match(fileContent, @"namespace\s.+$", RegexOptions.Multiline);
                     var importMatch = Regex.Matches(fileContent, @"using\s.+$", RegexOptions.Multiline);
                     return new ProgramFile
@@ -76,7 +84,7 @@ namespace Application
 
             File.WriteAllText(new FileInfo(_options.OutputFile).FullName, code);
 
-            Console.WriteLine("Watcher finished.");
+            Console.WriteLine("Compiler finished.");
         }
 
         // Remove imports provided by the system.
