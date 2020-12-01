@@ -41,7 +41,14 @@ namespace Application
 
         private static void OnWatcherTriggered(object sender, FileSystemEventArgs e)
         {
-            Compile();
+            try
+            {
+                Compile();
+            }
+            catch (Exception exception)
+            {
+                Console.WriteLine(exception.Message);
+            }
         }
 
         private static void Compile()
@@ -68,7 +75,8 @@ namespace Application
                         FileContent = fileContent.Trim(),
                         Namespace = namespaceMatch.Value.Replace("namespace ", "").Replace("\r", ""),
                         ApplicationImports = importMatch.Select(match =>
-                            match.Value.Replace("using ", "").Replace(";\r", ""))
+                            match.Value.Replace("using ", "").Replace(";\r", "")),
+                        ProgramFileType = GetProgramFileType(fileContent)
                     };
                 }).ToList();
             var cleansedFiles = CleanseImports(
@@ -120,23 +128,41 @@ namespace Application
         {
             var code = programFiles.ToList();
             var importCollection = code.SelectMany(c => c.SystemImports).Distinct();
-            var imports = "";
-            foreach (var systemImport in importCollection)
-            {
-                imports += $"using {systemImport};{Environment.NewLine}";
-            }
+            var imports = importCollection
+                .Aggregate("", (current, systemImport) => current + $"using {systemImport};{Environment.NewLine}");
 
             var codeContent = code
                 .Select(file => file.FileContent)
                 .Select(content => content
                     .Remove(content.LastIndexOf(Environment.NewLine, StringComparison.Ordinal)))
-                .Select(contentWithoutLastLine => contentWithoutLastLine
-                    .Split("class")
-                    .Last()
-                    .Insert(0, "class"))
+                .Select(contentWithoutLastLine =>
+                {
+                    var type = GetProgramFileType(contentWithoutLastLine).ToString("F").ToLower();
+                    return contentWithoutLastLine
+                        .Split(type)
+                        .Last()
+                        .Insert(0, type);
+                })
                 .Aggregate("", (current, contentClass) => current + $"\t{contentClass}{Environment.NewLine}{Environment.NewLine}");
 
             return $"{imports}\r\nnamespace CodinGame\r\n{{\r\n{codeContent.TrimEnd()}\r\n}}";
+        }
+
+        private static ProgramFileType GetProgramFileType(string content)
+        {
+            var indices = new Dictionary<ProgramFileType, int?>
+            {
+                {ProgramFileType.Class, content.IndexOf("class", StringComparison.Ordinal)},
+                {ProgramFileType.Interface, content.IndexOf("interface", StringComparison.Ordinal)},
+                {ProgramFileType.Enum, content.IndexOf("enum", StringComparison.Ordinal)},
+                {ProgramFileType.Struct, content.IndexOf("struct", StringComparison.Ordinal)}
+            };
+
+            return indices
+                .Where(index => index.Value >= 0)
+                .OrderBy(index => index.Value)
+                .Select(index => index.Key)
+                .First();
         }
     }
 }

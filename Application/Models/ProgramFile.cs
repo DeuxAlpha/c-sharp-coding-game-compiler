@@ -12,5 +12,6 @@ namespace Application.Models
         public string FileContent { get; set; }
         public IEnumerable<string> ApplicationImports { get; set; }
         public IEnumerable<string> SystemImports { get; set; }
+        public ProgramFileType ProgramFileType { get; set; }
     }
 }
