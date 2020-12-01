@@ -1,12 +1,13 @@
 ﻿using System;
+using TestApp.Services;
 
 namespace TestApp
 {
-    class Program
+    internal static class Program
     {
-        static void Main(string[] args)
+        private static void Main(string[] args)
         {
-            Console.WriteLine("Hello World!");
+            TestService.Test("Testing");
         }
     }
 }
