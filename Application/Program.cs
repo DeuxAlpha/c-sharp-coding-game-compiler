@@ -41,15 +41,15 @@ namespace Application
 
         private static void OnWatcherTriggered(object sender, FileSystemEventArgs e)
         {
-            Console.WriteLine("Change triggered.");
             Compile();
         }
 
         private static void Compile()
         {
             var directoryInfo = new DirectoryInfo(_options.WorkingDirectory);
+            var outputFile = new FileInfo(_options.OutputFile);
             var programFiles = Directory.GetFiles(directoryInfo.FullName, "*.cs", SearchOption.AllDirectories)
-                .Where(file => !file.Contains(@"\obj\") && !file.Contains(@"\bin\"))
+                .Where(file => !file.Contains(@"\obj\") && !file.Contains(@"\bin\") && file != outputFile.FullName)
                 .Select(file =>
                 {
                     using var fileStream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
@@ -60,8 +60,8 @@ namespace Application
                         fileContent += $"{streamReader.ReadLine()}{Environment.NewLine}";
                     }
 
-                    var namespaceMatch = Regex.Match(fileContent, @"namespace\s.+$", RegexOptions.Multiline);
-                    var importMatch = Regex.Matches(fileContent, @"using\s.+$", RegexOptions.Multiline);
+                    var namespaceMatch = Regex.Match(fileContent, @"^namespace\s.+$", RegexOptions.Multiline);
+                    var importMatch = Regex.Matches(fileContent, @"^using\s.+$", RegexOptions.Multiline);
                     return new ProgramFile
                     {
                         FileInfo = new FileInfo(file),
@@ -82,9 +82,7 @@ namespace Application
 
             var code = GetCode(usedCode);
 
-            File.WriteAllText(new FileInfo(_options.OutputFile).FullName, code);
-
-            Console.WriteLine("Compiler finished.");
+            File.WriteAllText(outputFile.FullName, code);
         }
 
         // Remove imports provided by the system.
@@ -106,6 +104,7 @@ namespace Application
             ICollection<ProgramFile> programFiles)
         {
             var usedCode = new List<ProgramFile>(new[] {entryFile});
+
             foreach (var import in entryFile.ApplicationImports)
             {
                 foreach (var file in programFiles.Where(file => file.Namespace == import))
@@ -137,7 +136,7 @@ namespace Application
                     .Insert(0, "class"))
                 .Aggregate("", (current, contentClass) => current + $"\t{contentClass}{Environment.NewLine}{Environment.NewLine}");
 
-            return $"{imports}\r\n{codeContent}";
+            return $"{imports}\r\nnamespace CodinGame\r\n{{\r\n{codeContent.TrimEnd()}\r\n}}";
         }
     }
 }
