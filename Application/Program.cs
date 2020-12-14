@@ -13,6 +13,8 @@ namespace Application
     {
         private static CliOptions _options;
 
+        private static List<ProgramFile> _usedCode = new List<ProgramFile>();
+
         private static void Main(string[] args)
         {
             Parser.Default.ParseArguments<CliOptions>(args).WithParsed(options =>
@@ -86,11 +88,13 @@ namespace Application
             var entryFile = cleansedFiles.First(file =>
                 file.FileInfo.Name == _options.EntryFile || file.FileInfo.FullName == _options.EntryFile);
 
-            var usedCode = FilterUnusedCode(entryFile, cleansedFiles);
+            FilterUnusedCode(entryFile, cleansedFiles);
 
-            var code = GetCode(usedCode);
+            var code = GetCode(_usedCode);
 
             File.WriteAllText(outputFile.FullName, code);
+
+            _usedCode.Clear();
         }
 
         // Remove imports provided by the system.
@@ -107,21 +111,20 @@ namespace Application
             });
         }
 
-        private static IEnumerable<ProgramFile> FilterUnusedCode(
+        private static void FilterUnusedCode(
             ProgramFile entryFile,
             ICollection<ProgramFile> programFiles)
         {
-            var usedCode = new List<ProgramFile>(new[] {entryFile});
+            if (_usedCode.Contains(entryFile)) return;
+            _usedCode.Add(entryFile);
 
             foreach (var import in entryFile.ApplicationImports)
             {
                 foreach (var file in programFiles.Where(file => file.Namespace == import))
                 {
-                    usedCode.AddRange(FilterUnusedCode(file, programFiles));
+                    FilterUnusedCode(file, programFiles);
                 }
             }
-
-            return usedCode.Distinct();
         }
 
         private static string GetCode(IEnumerable<ProgramFile> programFiles)
@@ -137,11 +140,12 @@ namespace Application
                     .Remove(content.LastIndexOf(Environment.NewLine, StringComparison.Ordinal)))
                 .Select(contentWithoutLastLine =>
                 {
-                    var type = GetProgramFileType(contentWithoutLastLine).ToString("F").ToLower();
+                    var type = GetProgramFileType(contentWithoutLastLine);
+                    var typeString = ProgramFileTypeHelper.GetClassType(type);
                     return contentWithoutLastLine
-                        .Split(type)
+                        .Split(typeString)
                         .Last()
-                        .Insert(0, type);
+                        .Insert(0, typeString);
                 })
                 .Aggregate("", (current, contentClass) => current + $"\t{contentClass}{Environment.NewLine}{Environment.NewLine}");
 
@@ -153,6 +157,8 @@ namespace Application
             var indices = new Dictionary<ProgramFileType, int?>
             {
                 {ProgramFileType.Class, content.IndexOf("class", StringComparison.Ordinal)},
+                {ProgramFileType.PartialClass, content.IndexOf("partial class", StringComparison.Ordinal)},
+                {ProgramFileType.StaticClass, content.IndexOf("static class", StringComparison.Ordinal)},
                 {ProgramFileType.Interface, content.IndexOf("interface", StringComparison.Ordinal)},
                 {ProgramFileType.Enum, content.IndexOf("enum", StringComparison.Ordinal)},
                 {ProgramFileType.Struct, content.IndexOf("struct", StringComparison.Ordinal)}
