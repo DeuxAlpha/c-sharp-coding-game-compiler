@@ -56,7 +56,7 @@ namespace Application
         private static void Compile()
         {
             var directoryInfo = new DirectoryInfo(_options.WorkingDirectory);
-            var outputFile = new FileInfo(_options.OutputFile);
+            var outputFile = new FileInfo(Path.Combine(directoryInfo.FullName, _options.OutputFile));
             var programFiles = Directory.GetFiles(directoryInfo.FullName, "*.cs", SearchOption.AllDirectories)
                 .Where(file => !file.Contains(@"\obj\") && !file.Contains(@"\bin\") && file != outputFile.FullName)
                 .Select(file =>
@@ -85,8 +85,10 @@ namespace Application
                     programFiles,
                     programFiles.Select(file => file.Namespace).ToList())
                 .ToList();
+            var optionsEntryFile = new FileInfo(_options.EntryFile);
             var entryFile = cleansedFiles.First(file =>
-                file.FileInfo.Name == _options.EntryFile || file.FileInfo.FullName == _options.EntryFile);
+                string.Equals(file.FileInfo.Name, optionsEntryFile.Name, StringComparison.InvariantCultureIgnoreCase) || 
+                string.Equals(file.FileInfo.FullName, optionsEntryFile.FullName));
 
             FilterUnusedCode(entryFile, cleansedFiles);
 
